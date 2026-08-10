@@ -1,0 +1,2 @@
+#Chunking
+The chunks are generated per page instead of combining the entire pdf into a single text and chunking that. This means that a good amount of chunks end in the middle of the sentence. To counteract this I've reduced the original min/max chunk word size from 300-500 to 200-350.
