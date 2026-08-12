@@ -17,6 +17,7 @@ def main():
             doc.raw_text,
             doc.source_name,
             doc.page_number,
+            doc.document_hash,
             min_word=300,
             max_word=500,
             overlap_sentences=2,
