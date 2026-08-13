@@ -3,6 +3,8 @@ from pathlib import Path
 
 from src.extraction import load_pdf_document
 from src.chunking import chunk_text
+from src.embeddings import embed_and_store
+from src.cosmos_client import get_container
 
 current_dir = Path(__file__).parent
 file_path = current_dir / "data" / "cs-concepts.pdf"
@@ -23,6 +25,9 @@ def main():
             overlap_sentences=2,
         )
         all_chunks.extend(chunks)
+
+    container = get_container()
+    embed_and_store(all_chunks, container)
 
     print(f"Document count (pages): {len(documents)}")
     print(f"Chunks count: {len(all_chunks)}")
