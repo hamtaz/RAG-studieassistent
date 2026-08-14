@@ -4,46 +4,8 @@ Tar et testspørsmål, genererer embedding, og kjører en vector search-query
 mot Cosmos DB for å hente de N mest relevante chunkene.
 """
 
-import os
-from dotenv import load_dotenv
-
-from src.embeddings import get_embedding
 from src.cosmos_client import get_container
-
-load_dotenv()
-
-DEPLOYMENT_NAME = os.getenv("AZURE_AI_DEPLOYMENT_NAME")
-
-
-def vector_search(query: str, container, top_k: int = 5):
-    # Steg 1: generer embedding for spørsmålet, samme modell som ved lagring
-    query_embedding = get_embedding(query, DEPLOYMENT_NAME)
-
-    # Steg 2: bygg og kjør vector search-spørringen
-    # VectorDistance(c.embedding, @query_embedding) beregner cosinus-avstand
-    # mellom hvert lagret dokuments embedding og spørsmålets embedding.
-    # ORDER BY ... sorterer fra mest til minst relevant, TOP N begrenser antallet.
-    sql_query = f"""
-    SELECT TOP {top_k}
-        c.chunk_text,
-        c.source_name,
-        c.page_number,
-        c.page_end,
-        VectorDistance(c.embedding, @query_embedding) AS similarity_score
-    FROM c
-    ORDER BY VectorDistance(c.embedding, @query_embedding)
-    """
-
-    parameters = [{"name": "@query_embedding", "value": query_embedding}]
-
-    results = list(
-        container.query_items(
-            query=sql_query,
-            parameters=parameters,
-            enable_cross_partition_query=True,
-        )
-    )
-    return results
+from src.retrieval import vector_search
 
 
 def print_results(results):

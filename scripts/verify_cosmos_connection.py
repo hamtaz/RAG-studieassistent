@@ -3,36 +3,25 @@ Testscript for å verifisere tilkobling til Azure Cosmos DB.
 Kun for testing/debugging - ikke del av hovedpipelinen.
 """
 
-import os
 from azure.cosmos import CosmosClient, exceptions
-from dotenv import load_dotenv
 
-# Laster inn miljøvariabler fra .env-filen
-load_dotenv()
-
-COSMOS_URI = os.getenv("COSMOS_URI")
-COSMOS_KEY = os.getenv("COSMOS_KEY")
-DATABASE_NAME = os.getenv("COSMOS_DATABASE_NAME", "studieassistent")
-CONTAINER_NAME = os.getenv("COSMOS_CONTAINER_NAME", "chunk" \
-"")
+from src.config import get_settings
 
 
 def test_connection():
-    if not COSMOS_URI or not COSMOS_KEY:
-        print("FEIL: COSMOS_URI eller COSMOS_KEY er ikke satt i .env-filen.")
-        return
-
     try:
+        settings = get_settings()
+
         # Oppretter klient med key-basert autentisering
-        client = CosmosClient(COSMOS_URI, credential=COSMOS_KEY)
+        client = CosmosClient(settings.cosmos_uri, credential=settings.cosmos_key)
         print("Klient opprettet, kobler til database...")
 
         # Henter database
-        database = client.get_database_client(DATABASE_NAME)
+        database = client.get_database_client(settings.cosmos_database_name)
         print(f"Fant database: {database.id}")
 
         # Henter container
-        container = database.get_container_client(CONTAINER_NAME)
+        container = database.get_container_client(settings.cosmos_container_name)
         container_props = container.read()
         print(f"Fant container: {container_props['id']}")
 

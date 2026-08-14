@@ -1,20 +1,23 @@
-import os
+from functools import lru_cache
+
 from azure.cosmos import CosmosClient, ContainerProxy
-from dotenv import load_dotenv
 
-load_dotenv()
+from src.config import get_settings
 
-COSMOS_URI = os.getenv("COSMOS_URI")
-COSMOS_KEY = os.getenv("COSMOS_KEY")
-DATABASE_NAME = os.getenv("COSMOS_DATABASE_NAME", "studieassistent")
-CONTAINER_NAME = os.getenv("COSMOS_CONTAINER_NAME", "chunk")
+
+@lru_cache
+def _get_client() -> CosmosClient:
+    """Build (and cache) the CosmosClient once.
+
+    CosmosClient owns a connection pool and is meant to be long-lived and
+    shared, not constructed per call.
+    """
+    settings = get_settings()
+    return CosmosClient(settings.cosmos_uri, credential=settings.cosmos_key)
 
 
 def get_container() -> ContainerProxy:
-    if not COSMOS_URI or not COSMOS_KEY:
-        raise ValueError("COSMOS_URI or COSMOS_KEY missing in .env-file.")
-
-    client = CosmosClient(COSMOS_URI, credential=COSMOS_KEY)
-    database = client.get_database_client(DATABASE_NAME)
-    container = database.get_container_client(CONTAINER_NAME)
-    return container
+    settings = get_settings()
+    client = _get_client()
+    database = client.get_database_client(settings.cosmos_database_name)
+    return database.get_container_client(settings.cosmos_container_name)
