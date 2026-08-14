@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from azure.cosmos import CosmosClient, ContainerProxy
+from azure.cosmos import ContainerProxy, CosmosClient
 
 from src.config import get_settings
 

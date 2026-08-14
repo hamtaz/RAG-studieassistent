@@ -1,16 +1,16 @@
 # main.py
 from pathlib import Path
 
-from src.extraction import load_pdf_document
-from src.chunking import chunk_document
-from src.embeddings import embed_and_store
+from src.chunking import Chunk, chunk_document
 from src.cosmos_client import get_container
+from src.embeddings import embed_and_store
+from src.extraction import load_pdf_document
 
 current_dir = Path(__file__).parent
 file_path = current_dir / "data" / "cs-concepts.pdf"
 
 
-def main():
+def main() -> list[Chunk]:
     documents = load_pdf_document(file_path)
     if not documents:
         print(f"No extractable text in {file_path.name}.")
@@ -18,8 +18,11 @@ def main():
 
     # Chunk across the whole document rather than page by page, so sentences
     # spanning a page break stay whole and only one undersized tail can occur.
+    # page_number is Optional[int] on SourceDocument in general, but
+    # load_pdf_document always sets it (index + 1); the filter narrows the
+    # type for chunk_document without changing behavior on real PDF input.
     all_chunks = chunk_document(
-        [(doc.page_number, doc.raw_text) for doc in documents],
+        [(doc.page_number, doc.raw_text) for doc in documents if doc.page_number is not None],
         source_name=documents[0].source_name,
         document_hash=documents[0].document_hash,
         min_word=200,

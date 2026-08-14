@@ -2,7 +2,6 @@ import re
 from bisect import bisect_right
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
-from typing import Optional
 
 
 @dataclass
@@ -12,8 +11,8 @@ class Chunk:
     source_name: str
     wordcount: int
     document_hash: str
-    page_number: Optional[int] = None  # page the chunk starts on
-    page_end: Optional[int] = None  # page the chunk ends on, if it spans several
+    page_number: int | None = None  # page the chunk starts on
+    page_end: int | None = None  # page the chunk ends on, if it spans several
 
 
 # Sentence-ending punctuation, whitespace, then a capital (optionally behind an
@@ -25,9 +24,28 @@ SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+(?=[\"'(\[]?[A-Z])")
 # A period after one of these is a title or an abbreviation, not a sentence end.
 ABBREVIATIONS = frozenset(
     {
-        "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st",
-        "e.g", "i.e", "etc", "vs", "cf", "al", "approx",
-        "fig", "no", "vol", "pp", "inc", "ltd", "co",
+        "mr",
+        "mrs",
+        "ms",
+        "dr",
+        "prof",
+        "sr",
+        "jr",
+        "st",
+        "e.g",
+        "i.e",
+        "etc",
+        "vs",
+        "cf",
+        "al",
+        "approx",
+        "fig",
+        "no",
+        "vol",
+        "pp",
+        "inc",
+        "ltd",
+        "co",
     }
 )
 
@@ -117,12 +135,12 @@ def _join_pages(pages: Sequence[tuple[int, str]]) -> tuple[str, list[tuple[int, 
     return "".join(parts), page_starts
 
 
-def _page_lookup(page_starts: Sequence[tuple[int, int]]) -> Callable[[int], Optional[int]]:
+def _page_lookup(page_starts: Sequence[tuple[int, int]]) -> Callable[[int], int | None]:
     """Build an offset -> page number resolver over sorted page start offsets."""
     offsets = [offset for offset, _ in page_starts]
     numbers = [number for _, number in page_starts]
 
-    def page_at(offset: int) -> Optional[int]:
+    def page_at(offset: int) -> int | None:
         if not offsets:
             return None
         index = max(bisect_right(offsets, offset) - 1, 0)

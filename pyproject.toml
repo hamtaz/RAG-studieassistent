@@ -11,9 +11,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Only needed to run the test suite, never imported by main.py or src/*.
+# Only needed to run the test suite / lint / type-check, never imported by
+# main.py or src/*.
 dev = [
     "pytest>=9.1.1",
+    "ruff>=0.16.3",
+    "mypy>=2.3.0",
 ]
 
 [build-system]
@@ -28,3 +31,34 @@ testpaths = ["tests"]
 # Puts the repo root on sys.path so tests can `import src.*` without an
 # install step.
 pythonpath = ["."]
+
+[tool.ruff]
+# The longest existing line in the repo is 108 (tests/test_config.py) - this
+# fits current code rather than forcing a reflow of it.
+line-length = 110
+target-version = "py313"
+
+[tool.ruff.lint]
+# E/F: pycodestyle + pyflakes (real correctness-adjacent issues).
+# I: import sorting.
+# UP: pyupgrade (modern syntax).
+# B: bugbear (common bug patterns).
+# Deliberately not maximal (no ANN/docstring-coverage rules) - a meaningful,
+# low-noise baseline rather than zero-tolerance churn on files this project
+# didn't touch for that reason.
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+# Without this, mypy doesn't know BaseSettings synthesizes an __init__ where
+# required fields are optional-by-keyword (they can come from the
+# environment / .env at runtime, not just from call-site arguments), and
+# flags Settings() in get_settings() as missing every required field.
+plugins = ["pydantic.mypy"]
+# Scoped to src/ and main.py via the CLI invocation (mypy src main.py), not
+# to scripts/ (manual one-off verification scripts) or tests/ (pytest tests,
+# where full annotation coverage is unidiomatic). Deliberately not blanket
+# `strict = True` - this is a middle ground: real annotations required, but
+# not every strict-mode check.
+disallow_untyped_defs = true
+warn_return_any = true
+no_implicit_optional = true

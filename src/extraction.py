@@ -1,16 +1,17 @@
-import pdfplumber as pd
-from pathlib import Path
+import hashlib
 from dataclasses import dataclass
-from typing import Optional
+from pathlib import Path
+
+import pdfplumber as pd
 
 from src.cleaning import clean_page_text
 
-import hashlib
 
 def get_file_hash(file_path: Path) -> str:
     with open(file_path, "rb") as f:
         file_bytes = f.read()
-    return hashlib.sha256(file_bytes).hexdigest()[:12] 
+    return hashlib.sha256(file_bytes).hexdigest()[:12]
+
 
 @dataclass
 class SourceDocument:
@@ -18,10 +19,10 @@ class SourceDocument:
     source_type: str
     raw_text: str
     document_hash: str
-    page_number: Optional[int] = None
+    page_number: int | None = None
 
 
-def pdf_to_txt(file_path: str):
+def pdf_to_txt(file_path: Path) -> list[dict]:
     output = []
     with pd.open(file_path) as pdf:
         for index, page in enumerate(pdf.pages):
@@ -31,7 +32,7 @@ def pdf_to_txt(file_path: str):
         return output
 
 
-def load_pdf_document(file_path: str):
+def load_pdf_document(file_path: Path) -> list[SourceDocument]:
     documents = []
     hash = get_file_hash(file_path)
     for page in pdf_to_txt(file_path):
@@ -40,7 +41,7 @@ def load_pdf_document(file_path: str):
             source_type="pdf",
             page_number=page["page_number"],
             raw_text=page["text"],
-            document_hash = hash
+            document_hash=hash,
         )
         documents.append(document)
     return documents

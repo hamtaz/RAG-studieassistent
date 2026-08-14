@@ -1,5 +1,7 @@
 # Studieassistent — RAG Study Assistant
 
+[![CI](https://github.com/hamtaz/RAG-studieassistent/actions/workflows/ci.yml/badge.svg)](https://github.com/hamtaz/RAG-studieassistent/actions/workflows/ci.yml)
+
 A retrieval-augmented generation pipeline that turns a PDF into a searchable
 knowledge base: extract text, chunk it, embed it with Azure OpenAI, and store
 it in Azure Cosmos DB for vector search. Built as a learning project to

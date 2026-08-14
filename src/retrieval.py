@@ -31,7 +31,7 @@ def vector_search(query: str, container: ContainerProxy, top_k: int = 5) -> list
     ORDER BY VectorDistance(c.embedding, @query_embedding)
     """
 
-    parameters = [{"name": "@query_embedding", "value": query_embedding}]
+    parameters: list[dict[str, object]] = [{"name": "@query_embedding", "value": query_embedding}]
 
     results = list(
         container.query_items(

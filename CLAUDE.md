@@ -17,6 +17,10 @@ python main.py                       # full ingestion pipeline: PDF → chunks �
 pytest                               # unit tests (offline: no Azure credentials needed)
 pytest tests/test_chunking.py -k overlap    # single file / single test
 
+ruff check .                         # lint
+ruff format .                        # format (ruff format --check . in CI)
+mypy src main.py                     # type check — scoped, see below
+
 python -m scripts.verify_cosmos_connection  # verify Cosmos creds + vector policy/index + doc count
 python -m scripts.verify_vector_search      # end-to-end vector search against stored chunks
 python -m src.embeddings                    # smoke-test the embedding deployment, prints dimensions
@@ -26,7 +30,9 @@ python -m src.embeddings                    # smoke-test the embedding deploymen
 
 The `scripts/` files are *not* tests: they are manual verification scripts that hit live Azure. They are named `verify_*` precisely so pytest does not collect them. Run them from the repo root with `python -m`, never `python scripts/foo.py`.
 
-There is no linter, type checker, or CI yet.
+`mypy` is scoped to `src/` and `main.py` only (the `mypy src main.py` invocation, not a `[tool.mypy]` file-discovery setting) — `scripts/` are one-off manual checks and `tests/` are pytest tests, where full annotation coverage is unidiomatic. Within that scope it's `disallow_untyped_defs` + a couple of related checks, deliberately short of blanket `strict = True`; that's a considered middle ground, not an oversight. `[tool.mypy]` in `pyproject.toml` enables `plugins = ["pydantic.mypy"]`, without which mypy can't see that `BaseSettings` subclasses (`src/config.py`) synthesize required-but-env-sourced fields and flags `Settings()` as missing every argument.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs `ruff check`, `ruff format --check`, `mypy`, and `pytest` on every push/PR to `main`. No secrets required — that's a direct consequence of `src/config.py` reading env lazily and the test suite needing zero Azure credentials.
 
 ## Environment
 

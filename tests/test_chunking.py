@@ -229,9 +229,7 @@ def test_sentence_spanning_a_page_break_is_healed():
     chunks = make_document(pages, min_word=1, max_word=100)
 
     assert len(chunks) == 1
-    assert chunks[0].chunk_text == (
-        "An algorithm is a finite sequence of well-defined instructions."
-    )
+    assert chunks[0].chunk_text == ("An algorithm is a finite sequence of well-defined instructions.")
 
 
 def test_document_has_only_one_tail():
