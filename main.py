@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from src.extraction import load_pdf_document
-from src.chunking import chunk_text
+from src.chunking import chunk_document
 from src.embeddings import embed_and_store
 from src.cosmos_client import get_container
 
@@ -12,19 +12,20 @@ file_path = current_dir / "data" / "cs-concepts.pdf"
 
 def main():
     documents = load_pdf_document(file_path)
+    if not documents:
+        print(f"No extractable text in {file_path.name}.")
+        return []
 
-    all_chunks = []
-    for doc in documents:
-        chunks = chunk_text(
-            doc.raw_text,
-            doc.source_name,
-            doc.page_number,
-            doc.document_hash,
-            min_word=300,
-            max_word=500,
-            overlap_sentences=2,
-        )
-        all_chunks.extend(chunks)
+    # Chunk across the whole document rather than page by page, so sentences
+    # spanning a page break stay whole and only one undersized tail can occur.
+    all_chunks = chunk_document(
+        [(doc.page_number, doc.raw_text) for doc in documents],
+        source_name=documents[0].source_name,
+        document_hash=documents[0].document_hash,
+        min_word=200,
+        max_word=350,
+        overlap_sentences=2,
+    )
 
     container = get_container()
     embed_and_store(all_chunks, container)

@@ -66,7 +66,10 @@ def test_connection():
         )[0]
         print(f"\nAntall dokumenter i containeren: {item_count}")
 
-        print("\n✅ Tilkobling OK - alt ser riktig konfigurert ut.")
+        # Ingen emoji her: Windows-konsollen bruker cp1252 og kaster
+        # UnicodeEncodeError, som blir fanget nedenfor og feilaktig
+        # rapportert som at tilkoblingen feilet.
+        print("\nOK: Tilkobling fungerer - alt ser riktig konfigurert ut.")
 
     except exceptions.CosmosResourceNotFoundError as e:
         print(f"FEIL: Fant ikke ressurs - sjekk at database-/container-navn stemmer. {e}")

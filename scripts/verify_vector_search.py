@@ -28,6 +28,7 @@ def vector_search(query: str, container, top_k: int = 5):
         c.chunk_text,
         c.source_name,
         c.page_number,
+        c.page_end,
         VectorDistance(c.embedding, @query_embedding) AS similarity_score
     FROM c
     ORDER BY VectorDistance(c.embedding, @query_embedding)
@@ -51,8 +52,14 @@ def print_results(results):
         return
 
     for i, item in enumerate(results):
+        # Chunks er delt opp over hele dokumentet, så én chunk kan spenne
+        # over flere sider. Viser sideintervall når start og slutt er ulike.
+        start = item.get("page_number")
+        end = item.get("page_end")
+        pages = f"side {start}" if end in (None, start) else f"side {start}-{end}"
+
         print(f"\n--- Found {i + 1} (score: {item['similarity_score']:.4f}) ---")
-        print(f"Source: {item['source_name']}, side {item['page_number']}")
+        print(f"Source: {item['source_name']}, {pages}")
         print(f"Text: {item['chunk_text']}...")
 
 

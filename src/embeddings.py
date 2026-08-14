@@ -21,7 +21,9 @@ client = AzureOpenAI(
 )
 
 def get_embedding(text: str, model: str):
-    text = text.replace("\n", " ")
+    # No normalization here on purpose. cleaning.clean_page_text() already
+    # flattened whitespace before chunking, so normalizing again would embed a
+    # different string than the one stored alongside the vector.
     return client.embeddings.create(input=[text], model=model).data[0].embedding
 
 def embed_and_store(chunks: list[Chunk], container: ContainerProxy):
