@@ -1,10 +1,14 @@
 # main.py
+import logging
+import sys
 from pathlib import Path
 
 from src.chunking import Chunk, chunk_document
 from src.cosmos_client import get_container
 from src.embeddings import embed_and_store
 from src.extraction import load_pdf_document
+
+logger = logging.getLogger(__name__)
 
 current_dir = Path(__file__).parent
 file_path = current_dir / "data" / "cs-concepts.pdf"
@@ -13,7 +17,7 @@ file_path = current_dir / "data" / "cs-concepts.pdf"
 def main() -> list[Chunk]:
     documents = load_pdf_document(file_path)
     if not documents:
-        print(f"No extractable text in {file_path.name}.")
+        logger.warning("No extractable text in %s.", file_path.name)
         return []
 
     # Chunk across the whole document rather than page by page, so sentences
@@ -31,14 +35,26 @@ def main() -> list[Chunk]:
     )
 
     container = get_container()
-    embed_and_store(all_chunks, container)
+    failed_chunks = embed_and_store(all_chunks, container)
 
-    print(f"Document count (pages): {len(documents)}")
-    print(f"Chunks count: {len(all_chunks)}")
-    print(all_chunks[0])
+    logger.info("Document count (pages): %d", len(documents))
+    logger.info("Chunks count: %d", len(all_chunks))
+    logger.debug("First chunk: %s", all_chunks[0])
+
+    if failed_chunks:
+        # Nothing else imports main() (verified), so it's safe for it to own
+        # exit-code responsibility directly rather than needing a wrapper.
+        sys.exit(1)
 
     return all_chunks
 
 
 if __name__ == "__main__":
+    # Root stays at WARNING so third-party SDK loggers (azure.cosmos does
+    # full HTTP request/response tracing at INFO, including headers) don't
+    # get pulled up to INFO along with our own progress logging - only this
+    # app's own loggers ("src.*", "__main__") are raised.
+    logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.getLogger("src").setLevel(logging.INFO)
+    logging.getLogger("__main__").setLevel(logging.INFO)
     main()

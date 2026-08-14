@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     azure_ai_key: str
     azure_ai_deployment_name: str
     azure_ai_api_version: str = "2024-10-21"
+    # Bumped over the openai SDK's own default of 2. The SDK already retries
+    # transient errors (429, 5xx, connection failures) with exponential
+    # backoff internally - this only tunes how many attempts it gets.
+    azure_ai_max_retries: int = 5
 
 
 @lru_cache
