@@ -1,0 +1,109 @@
+{
+  "source_pdf": "cs-concepts.pdf",
+  "questions": [
+    {
+      "question": "According to the overview, what does the author say computer science involves beyond code, cubicles, and computers?",
+      "expected_pages": [1]
+    },
+    {
+      "question": "What career sectors do computer scientists work in?",
+      "expected_pages": [2]
+    },
+    {
+      "question": "What is a computer program, and how is it related to programming?",
+      "expected_pages": [3]
+    },
+    {
+      "question": "What do high-level programming languages abstract away from the programmer?",
+      "expected_pages": [4]
+    },
+    {
+      "question": "What are the two main spaces in an IDE, and what is each one for?",
+      "expected_pages": [5]
+    },
+    {
+      "question": "What does a compiler do to the code you write?",
+      "expected_pages": [6]
+    },
+    {
+      "question": "What are the four main techniques of computational thinking?",
+      "expected_pages": [7]
+    },
+    {
+      "question": "What real-world example is used to explain decomposition?",
+      "expected_pages": [8]
+    },
+    {
+      "question": "What is a shift cipher, and why isn't it very secure?",
+      "expected_pages": [9]
+    },
+    {
+      "question": "What is an algorithm?",
+      "expected_pages": [10]
+    },
+    {
+      "question": "What are the naming rules for variables, such as what characters they can start or contain?",
+      "expected_pages": [11]
+    },
+    {
+      "question": "What is string concatenation, and which operator is used to do it?",
+      "expected_pages": [12]
+    },
+    {
+      "question": "What are SyntaxError, NameError, and ZeroDivisionError?",
+      "expected_pages": [13]
+    },
+    {
+      "question": "How do you update a variable to a new value after it has already been created?",
+      "expected_pages": [14]
+    },
+    {
+      "question": "What are the two possible values of the Boolean data type?",
+      "expected_pages": [15]
+    },
+    {
+      "question": "How does the compiler compare two strings when using relational operators?",
+      "expected_pages": [16]
+    },
+    {
+      "question": "How does the boolean AND operator evaluate two conditions to decide True or False?",
+      "expected_pages": [17]
+    },
+    {
+      "question": "In the exercise about passing a tough class, what grade or exam score is needed to pass?",
+      "expected_pages": [18]
+    },
+    {
+      "question": "Why are loops useful instead of manually repeating code?",
+      "expected_pages": [19]
+    },
+    {
+      "question": "What is an iteration in a for loop?",
+      "expected_pages": [20]
+    },
+    {
+      "question": "How do while loops differ from for loops?",
+      "expected_pages": [21]
+    },
+    {
+      "question": "In the nested loop example, what happens to the inner loop's index as the outer loop executes?",
+      "expected_pages": [22]
+    },
+    {
+      "question": "What topic does Lesson 6 introduce at the end of the nested-loops section?",
+      "expected_pages": [23]
+    },
+    {
+      "question": "What is the difference between a formal parameter and an argument in a function?",
+      "expected_pages": [24]
+    },
+    {
+      "question": "What is exercise 6.5 asking the reader to write a function to do?",
+      "expected_pages": [25]
+    },
+    {
+      "question": "What does the author say in the feedback section at the end of the packet?",
+      "expected_pages": [26]
+    }
+  ]
+}

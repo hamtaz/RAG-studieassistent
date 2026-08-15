@@ -24,6 +24,9 @@ mypy src main.py                     # type check — scoped, see below
 python -m scripts.verify_cosmos_connection  # verify Cosmos creds + vector policy/index + doc count
 python -m scripts.verify_vector_search      # end-to-end vector search against stored chunks
 python -m src.embeddings                    # smoke-test the embedding deployment, prints dimensions
+
+python -m scripts.evaluate_retrieval                          # score retrieval: recall@k + MRR against data/eval_questions.json
+python -m scripts.evaluate_retrieval --questions other.json   # score a different document's eval set
 ```
 
 `tests/` holds real pytest tests and is the only thing pytest collects (`testpaths` under `[tool.pytest.ini_options]` in `pyproject.toml`). They cover the pure functions only — `cleaning`, `chunking`, and `get_file_hash` — so they need no network and no Azure credentials. That same section sets `pythonpath = ["."]` so `import src.*` resolves without an install step.
@@ -57,8 +60,13 @@ Gotcha: `get_settings()` is deliberately **not** a module-level `Settings()` ins
 4. **`embeddings.py`** — `embed_and_store()` embeds chunks in batches (`get_embeddings()`, `DEFAULT_BATCH_SIZE = 100` chunks/call, not one API call per chunk) then upserts each individually, building the Cosmos document id as `{document_hash}_{page_number}_{chunk.id}`. That composition is what makes ids globally unique despite the per-page counter, and it makes writes idempotent: re-running `main.py` on the same PDF upserts over the same documents instead of duplicating them. Returns the list of failed chunk ids (empty = clean run) instead of `None`, so `main()` can `sys.exit(1)` on partial failure. Its `except` is narrowed to `(openai.OpenAIError, azure.core.exceptions.AzureError)` — real, verified exception roots for both SDKs — so a bug in this codebase (e.g. a bad attribute access) crashes loudly instead of being logged as just another failed chunk. `get_embedding()` (singular, used by `retrieval.py` for one-off queries) deliberately does **not** normalize its input — `cleaning.py` owns that, and normalizing twice would embed a different string than the one stored.
 5. **`cosmos_client.py`** — key-based `ContainerProxy` factory, injected into `embed_and_store()` so storage stays decoupled from embedding.
 6. **`retrieval.py`** — `vector_search()`, the query-side counterpart to `embeddings.py`. Not exercised by `main.py` (that's ingestion-only); called from `scripts/verify_vector_search.py` today and is what roadmap step 3 (LLM calls) will import for RAG context retrieval.
+7. **`evaluation.py`** — pure scoring functions (`is_relevant`, `reciprocal_rank`, `hit_at_k`, `evaluate`) for measuring `vector_search()` quality against a hand-written ground-truth set, no Azure calls itself. `scripts/evaluate_retrieval.py` is the live-hitting counterpart, same split as `retrieval.py`/`verify_vector_search.py`.
 
 Retrieval embeds the query with the *same* deployment and orders by `VectorDistance(c.embedding, @query_embedding)` — query and stored embeddings must always come from one model, so changing `AZURE_AI_DEPLOYMENT_NAME` invalidates everything already in the container.
+
+## Retrieval evaluation
+
+`data/eval_questions.json` is `{"source_pdf": ..., "questions": [{"question", "expected_pages"}, ...]}` — ground truth is a **page range in one named source document**, not a chunk id, because chunk boundaries shift whenever `min_word`/`max_word`/`overlap_sentences` change (already happened once: 300/500 → 200/350) and a chunk-id-pinned eval set would need rewriting every time. `is_relevant()` (`src/evaluation.py`) checks `source_name` first and page-range overlap second — `vector_search()` queries the whole Cosmos container with no document filter, so once more than one PDF is ever ingested, a page-only check could wrongly count a same-numbered page from the *wrong* document as a hit. `scripts/evaluate_retrieval.py` takes `--questions` (default `data/eval_questions.json`, targeting the bundled `data/cs-concepts.pdf`) precisely so the eval format doesn't bake in "the PDF in `data/`" as a permanent assumption — a different ingested document gets its own eval file naming its own `source_pdf`. `recall@k`/`MRR` are defined for single-answer retrieval (hit-rate and mean reciprocal rank), documented in `src/evaluation.py`'s module docstring since "recall@k" normally implies a multi-relevant-document set this project doesn't have. Current measured numbers (26 questions, `cs-concepts.pdf`, current chunking settings) live in the README's "Retrieval evaluation" section, not duplicated here — that's the number that goes stale first when chunking gets retuned.
 
 ## Conventions and known rough edges
 

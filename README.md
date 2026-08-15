@@ -137,14 +137,45 @@ pages independently instead of over the whole document, at the same
 `min_word`/`max_word`, produces 37 chunks with 19 outside the budget — one
 undersized tail per page instead of one for the whole document.
 
+## Retrieval evaluation
+
+`data/eval_questions.json` is a hand-written ground-truth set — 26 questions
+against `data/cs-concepts.pdf`, each naming the page(s) its answer lives on.
+`src/evaluation.py` scores `vector_search()` results against it: **recall@k**
+(fraction of questions with a relevant chunk in the top k) and **MRR** (mean
+reciprocal rank of the first relevant chunk). A result only counts as
+relevant if it's from the same source document *and* its page range overlaps
+the expected pages — the container can hold chunks from more than one
+ingested PDF, so page number alone isn't enough to prove a match.
+
+```powershell
+python -m scripts.evaluate_retrieval                          # scores data/eval_questions.json
+python -m scripts.evaluate_retrieval --questions other.json   # scores a different document's eval set
+```
+
+Measured against the current chunking settings (`min_word=200, max_word=350,
+overlap_sentences=2`):
+
+```
+recall@1: 0.92
+recall@3: 0.96
+recall@5: 1.00
+MRR: 0.952
+(26 questions)
+```
+
+This is what makes chunking parameters a measured decision instead of a
+guess — retuning `min_word`/`max_word` can now be checked against a number,
+not just a chunk count.
+
 ## Repository layout
 
 | Path | Purpose |
 |---|---|
-| `src/` | Pipeline modules: `extraction`, `cleaning`, `chunking`, `embeddings`, `cosmos_client` |
-| `scripts/` | Manual scripts that hit live Azure (`verify_*`) — not pytest tests |
+| `src/` | Pipeline modules: `extraction`, `cleaning`, `chunking`, `embeddings`, `cosmos_client`, `retrieval`, `evaluation` |
+| `scripts/` | Manual scripts that hit live Azure (`verify_*`, `evaluate_retrieval`) — not pytest tests |
 | `tests/` | Unit tests for the pure pipeline stages |
-| `data/` | Source PDF(s) for ingestion |
+| `data/` | Source PDF(s) for ingestion, plus `eval_questions.json` ground truth |
 | `main.py` | Ingestion entry point: PDF → chunks → embed → upsert |
 | `plan.md`, `notes.md` | Working notes (Norwegian) from building this project step by step |
 | `CODE_REVIEW.md` | A self-review of the codebase against professional engineering practice |
@@ -154,13 +185,12 @@ undersized tail per page instead of one for the whole document.
 A fuller list with file/line references lives in [`CODE_REVIEW.md`](CODE_REVIEW.md).
 The headline items not yet addressed:
 
-- No retry/backoff on embedding calls, so a rate limit silently drops chunks
-  instead of retrying.
-- One embedding API call per chunk rather than batched requests.
 - Authentication uses a Cosmos primary key in `.env`, not Managed Identity /
   RBAC.
-- No CI, linter, or type checker yet.
+- `main.py` is hardwired to `data/cs-concepts.pdf` — no CLI to point it at a
+  different file.
 - Cleaning doesn't remove repeating headers/footers or page numbers.
+- No hybrid (keyword + vector) search or re-ranking.
 
 ## Roadmap
 
