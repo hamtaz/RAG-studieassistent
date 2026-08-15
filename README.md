@@ -8,10 +8,10 @@ it in Azure Cosmos DB for vector search. Built as a learning project to
 practice RAG fundamentals end to end, with an emphasis on getting the data
 pipeline correct before adding an LLM on top of it.
 
-**Status:** steps 1–2 of the 7-step roadmap in [`plan.md`](plan.md) are done —
-extraction/chunking and embeddings/vector storage. Steps 3–7 (LLM calls via
-Azure AI Foundry, content-safety filtering, a FastAPI wrapper, an MCP server,
-and deployment) are not built yet.
+**Status:** steps 1–3 of the 7-step roadmap in [`plan.md`](plan.md) are done —
+extraction/chunking, embeddings/vector storage, and grounded LLM answers via
+Azure AI Foundry. Steps 4–7 (content-safety filtering, a FastAPI wrapper, an
+MCP server, and deployment) are not built yet.
 
 ## Architecture
 
@@ -50,6 +50,12 @@ by `VectorDistance` in Cosmos — query and stored vectors have to come from the
 same model, so retrieval correctness is tied to `AZURE_AI_DEPLOYMENT_NAME`
 never silently changing.
 
+Generation (`src/generation.py`, called from `scripts/ask.py`) takes retrieved
+chunks, builds a prompt that grounds the answer in them, and calls a separate
+chat deployment (`AZURE_AI_CHAT_DEPLOYMENT_NAME`) on the same Azure AI
+resource — the same `AzureOpenAI` client (`src/embeddings.py`'s `get_client()`)
+is reused for both embedding and chat calls, just with a different `model=`.
+
 ## Design choices
 
 **Cosmos DB (NoSQL API) for vector search, not a dedicated vector database.**
@@ -85,6 +91,21 @@ idempotent — re-running `main.py` on an unchanged PDF upserts over the same
 documents instead of duplicating them, and a changed PDF gets a new hash and
 therefore new ids.
 
+**Cosmos auth defaults to Managed Identity / RBAC, not a stored key.**
+`COSMOS_KEY` is optional — set it for primary-key auth, or leave it blank to
+authenticate via `DefaultAzureCredential` instead (`az login` locally,
+Managed Identity once deployed), with no secret in `.env` at all. A stored
+primary key grants full read/write/delete over the whole account forever
+until manually rotated; RBAC scopes access to a specific data-plane role and
+needs no secret to leak. RBAC needs a one-time role assignment on the Cosmos
+account — see `CLAUDE.md`'s Environment section for the exact `az` command.
+
+**The generation prompt only allows answers traceable to the retrieved
+context, and requires an explicit "I don't know" otherwise.** An ungrounded
+RAG answer is worse than no answer — it looks sourced when it isn't. The
+system prompt (`src/generation.py`) requires inline page citations for every
+claim, which also makes a wrong or unsupported answer easy to catch by eye.
+
 **All environment config is read in exactly one place.** `src/config.py`
 validates every required variable at startup with `pydantic-settings` — one
 clear error listing everything missing, instead of a `ValueError` the first
@@ -106,12 +127,15 @@ Portal step), and an Azure OpenAI embedding deployment.
 pip install -e ".[dev]"
 
 copy .env.example .env
-# fill in COSMOS_URI, COSMOS_KEY, AZURE_AI_ENDPOINT, AZURE_AI_KEY,
-# AZURE_AI_DEPLOYMENT_NAME
+# fill in COSMOS_URI, AZURE_AI_ENDPOINT, AZURE_AI_KEY, AZURE_AI_DEPLOYMENT_NAME,
+# AZURE_AI_CHAT_DEPLOYMENT_NAME
+# COSMOS_KEY is optional - leave blank to use DefaultAzureCredential (RBAC)
+# instead, see CLAUDE.md's Environment section for the required role assignment
 
 python -m scripts.verify_cosmos_connection   # confirm Cosmos + vector setup
 python main.py                                # ingest data/cs-concepts.pdf
 python -m scripts.verify_vector_search        # sanity-check retrieval
+python -m scripts.ask "What is an algorithm?" # ask a grounded question end to end
 ```
 
 Run the test suite (offline, no Azure credentials needed — it only covers
@@ -172,8 +196,8 @@ not just a chunk count.
 
 | Path | Purpose |
 |---|---|
-| `src/` | Pipeline modules: `extraction`, `cleaning`, `chunking`, `embeddings`, `cosmos_client`, `retrieval`, `evaluation` |
-| `scripts/` | Manual scripts that hit live Azure (`verify_*`, `evaluate_retrieval`) — not pytest tests |
+| `src/` | Pipeline modules: `extraction`, `cleaning`, `chunking`, `embeddings`, `cosmos_client`, `retrieval`, `generation`, `evaluation` |
+| `scripts/` | Manual scripts that hit live Azure (`verify_*`, `evaluate_retrieval`, `ask`) — not pytest tests |
 | `tests/` | Unit tests for the pure pipeline stages |
 | `data/` | Source PDF(s) for ingestion, plus `eval_questions.json` ground truth |
 | `main.py` | Ingestion entry point: PDF → chunks → embed → upsert |
@@ -185,15 +209,18 @@ not just a chunk count.
 A fuller list with file/line references lives in [`CODE_REVIEW.md`](CODE_REVIEW.md).
 The headline items not yet addressed:
 
-- Authentication uses a Cosmos primary key in `.env`, not Managed Identity /
-  RBAC.
 - `main.py` is hardwired to `data/cs-concepts.pdf` — no CLI to point it at a
   different file.
+- Azure OpenAI still authenticates with a stored key (`AZURE_AI_KEY`) — Cosmos
+  moved to optional Managed Identity / RBAC, the OpenAI key hasn't; Key Vault
+  is the documented path for it at deploy time (roadmap step 7).
 - Cleaning doesn't remove repeating headers/footers or page numbers.
 - No hybrid (keyword + vector) search or re-ranking.
+- No automated grounding/quality eval for generated answers yet (retrieval has
+  one — see above; generation doesn't).
 
 ## Roadmap
 
 See [`plan.md`](plan.md) for the full 7-step plan (Norwegian). Remaining steps:
-LLM calls via Azure AI Foundry, content-safety filtering, a FastAPI endpoint,
-an MCP server wrapping that endpoint, and deployment to Azure App Service.
+content-safety filtering, a FastAPI endpoint, an MCP server wrapping that
+endpoint, and deployment to Azure App Service.

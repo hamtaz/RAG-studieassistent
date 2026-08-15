@@ -3,25 +3,20 @@ Testscript for å verifisere tilkobling til Azure Cosmos DB.
 Kun for testing/debugging - ikke del av hovedpipelinen.
 """
 
-from azure.cosmos import CosmosClient, exceptions
+from azure.cosmos import exceptions
 
 from src.config import get_settings
+from src.cosmos_client import get_container
 
 
 def test_connection():
     try:
         settings = get_settings()
 
-        # Oppretter klient med key-basert autentisering
-        client = CosmosClient(settings.cosmos_uri, credential=settings.cosmos_key)
-        print("Klient opprettet, kobler til database...")
+        auth_mode = "key-basert" if settings.cosmos_key else "DefaultAzureCredential (RBAC)"
+        print(f"Kobler til med autentisering: {auth_mode}")
 
-        # Henter database
-        database = client.get_database_client(settings.cosmos_database_name)
-        print(f"Fant database: {database.id}")
-
-        # Henter container
-        container = database.get_container_client(settings.cosmos_container_name)
+        container = get_container()
         container_props = container.read()
         print(f"Fant container: {container_props['id']}")
 

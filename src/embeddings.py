@@ -18,12 +18,14 @@ DEFAULT_BATCH_SIZE = 100
 
 
 @lru_cache
-def _get_client() -> AzureOpenAI:
+def get_client() -> AzureOpenAI:
     """Build (and cache) the AzureOpenAI client once, on first real use.
 
     Not built at module scope: that would make importing this module fail
     without live Azure credentials, which is what broke unit-testing it
-    before.
+    before. Shared with src/generation.py - one AzureOpenAI client, used for
+    both embeddings and chat completions (different `model=` deployment per
+    call), same as one Azure AI resource with two deployments.
     """
     settings = get_settings()
     return AzureOpenAI(
@@ -42,13 +44,13 @@ def get_embedding(text: str, model: str) -> list[float]:
     # No normalization here on purpose. cleaning.clean_page_text() already
     # flattened whitespace before chunking, so normalizing again would embed a
     # different string than the one stored alongside the vector.
-    client = _get_client()
+    client = get_client()
     return client.embeddings.create(input=[text], model=model).data[0].embedding
 
 
 def get_embeddings(texts: list[str], model: str) -> list[list[float]]:
     """Embed many strings in one API call instead of one call per string."""
-    client = _get_client()
+    client = get_client()
     response = client.embeddings.create(input=texts, model=model)
     # Sort by the API's own index rather than trusting response order to
     # match input order - cheap insurance against silently pairing the wrong

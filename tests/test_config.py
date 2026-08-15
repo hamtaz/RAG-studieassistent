@@ -5,10 +5,10 @@ from src.config import Settings, get_settings
 
 REQUIRED = {
     "cosmos_uri": "https://example.documents.azure.com:443/",
-    "cosmos_key": "fake-key",
     "azure_ai_endpoint": "https://example.openai.azure.com/",
     "azure_ai_key": "fake-key",
     "azure_ai_deployment_name": "fake-deployment",
+    "azure_ai_chat_deployment_name": "fake-chat-deployment",
 }
 
 
@@ -39,7 +39,14 @@ def test_settings_accepts_all_required_fields():
 
 
 @pytest.mark.parametrize(
-    "missing", ["cosmos_uri", "cosmos_key", "azure_ai_endpoint", "azure_ai_key", "azure_ai_deployment_name"]
+    "missing",
+    [
+        "cosmos_uri",
+        "azure_ai_endpoint",
+        "azure_ai_key",
+        "azure_ai_deployment_name",
+        "azure_ai_chat_deployment_name",
+    ],
 )
 def test_settings_raises_on_missing_required_field(missing):
     values = {key: value for key, value in REQUIRED.items() if key != missing}
@@ -62,6 +69,17 @@ def test_settings_defaults():
     assert settings.cosmos_database_name == "studieassistent"
     assert settings.cosmos_container_name == "chunk"
     assert settings.azure_ai_api_version == "2024-10-21"
+
+
+def test_settings_cosmos_key_defaults_to_none():
+    """No COSMOS_KEY set means RBAC via DefaultAzureCredential, not an error."""
+    settings = make_settings()
+    assert settings.cosmos_key is None
+
+
+def test_settings_cosmos_key_overridable():
+    settings = make_settings(cosmos_key="fake-key")
+    assert settings.cosmos_key == "fake-key"
 
 
 def test_settings_defaults_are_overridable():
