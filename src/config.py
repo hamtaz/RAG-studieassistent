@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     # backoff internally - this only tunes how many attempts it gets.
     azure_ai_max_retries: int = 5
 
+    # Optional: a separate Azure AI Content Safety resource, used by
+    # src/safety.py to moderate generation input/output. Optional because
+    # ingestion and retrieval don't need it and a student project may not
+    # have it provisioned yet - see src/safety.py's pass-through behavior.
+    content_safety_endpoint: str | None = None
+    content_safety_key: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

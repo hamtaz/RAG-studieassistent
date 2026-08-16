@@ -8,10 +8,10 @@ it in Azure Cosmos DB for vector search. Built as a learning project to
 practice RAG fundamentals end to end, with an emphasis on getting the data
 pipeline correct before adding an LLM on top of it.
 
-**Status:** steps 1–3 of the 7-step roadmap in [`plan.md`](plan.md) are done —
-extraction/chunking, embeddings/vector storage, and grounded LLM answers via
-Azure AI Foundry. Steps 4–7 (content-safety filtering, a FastAPI wrapper, an
-MCP server, and deployment) are not built yet.
+**Status:** steps 1–5 of the 7-step roadmap in [`plan.md`](plan.md) are done —
+extraction/chunking, embeddings/vector storage, grounded LLM answers via
+Azure AI Foundry, content moderation + prompt-injection defense, and a
+FastAPI endpoint. Steps 6–7 (an MCP server and deployment) are not built yet.
 
 ## Architecture
 
@@ -55,6 +55,15 @@ chunks, builds a prompt that grounds the answer in them, and calls a separate
 chat deployment (`AZURE_AI_CHAT_DEPLOYMENT_NAME`) on the same Azure AI
 resource — the same `AzureOpenAI` client (`src/embeddings.py`'s `get_client()`)
 is reused for both embedding and chat calls, just with a different `model=`.
+
+Before `generation.py` calls the LLM (and again on its output), `src/safety.py`
+moderates the text via Azure AI Content Safety, if configured.
+
+`src/api.py` exposes this over HTTP: a single `POST /ask` endpoint (FastAPI)
+that validates the request body, calls `answer_question()`, and returns
+`{"answer": ..., "sources": [...]}`. A failed upstream call (`OpenAIError` /
+`AzureError`) becomes a `502`; anything unexpected falls through to FastAPI's
+default `500` handler rather than a bespoke error path for a one-endpoint app.
 
 ## Design choices
 
@@ -106,6 +115,21 @@ RAG answer is worse than no answer — it looks sourced when it isn't. The
 system prompt (`src/generation.py`) requires inline page citations for every
 claim, which also makes a wrong or unsupported answer easy to catch by eye.
 
+**Content moderation is a pass-through when unconfigured, prompt-injection
+defense is not optional.** `src/safety.py` calls Azure AI Content Safety's
+`analyze_text` on the question before generation and on the answer after it,
+rejecting either side above a deliberately strict severity threshold — but if
+`CONTENT_SAFETY_ENDPOINT`/`CONTENT_SAFETY_KEY` aren't set, it logs a warning
+and lets the text through rather than breaking `main.py`/`scripts/ask.py` for
+setups that haven't provisioned that resource yet. Prompt injection is
+handled differently: Content Safety's Prompt Shields detector isn't exposed
+by any published version of `azure-ai-contentsafety` (verified against
+1.0.0 and 1.0.0b1 — REST-only today), so instead `generation.py`'s system
+prompt explicitly instructs the model to treat any instruction embedded in
+the question or in retrieved context as untrusted text, never as a command.
+`scripts/check_prompt_injection.py` is a behavioral check against that
+defense, not an automated detector.
+
 **All environment config is read in exactly one place.** `src/config.py`
 validates every required variable at startup with `pydantic-settings` — one
 clear error listing everything missing, instead of a `ValueError` the first
@@ -131,11 +155,17 @@ copy .env.example .env
 # AZURE_AI_CHAT_DEPLOYMENT_NAME
 # COSMOS_KEY is optional - leave blank to use DefaultAzureCredential (RBAC)
 # instead, see CLAUDE.md's Environment section for the required role assignment
+# CONTENT_SAFETY_ENDPOINT/CONTENT_SAFETY_KEY are optional - leave blank to
+# skip moderation
 
 python -m scripts.verify_cosmos_connection   # confirm Cosmos + vector setup
 python main.py                                # ingest data/cs-concepts.pdf
 python -m scripts.verify_vector_search        # sanity-check retrieval
 python -m scripts.ask "What is an algorithm?" # ask a grounded question end to end
+python -m scripts.check_prompt_injection      # eyeball behavior on adversarial questions
+
+uvicorn src.api:app --reload                  # run the API locally at http://127.0.0.1:8000
+curl -X POST http://127.0.0.1:8000/ask -H "Content-Type: application/json" -d "{\"question\": \"What is an algorithm?\"}"
 ```
 
 Run the test suite (offline, no Azure credentials needed — it only covers
@@ -196,8 +226,8 @@ not just a chunk count.
 
 | Path | Purpose |
 |---|---|
-| `src/` | Pipeline modules: `extraction`, `cleaning`, `chunking`, `embeddings`, `cosmos_client`, `retrieval`, `generation`, `evaluation` |
-| `scripts/` | Manual scripts that hit live Azure (`verify_*`, `evaluate_retrieval`, `ask`) — not pytest tests |
+| `src/` | Pipeline modules: `extraction`, `cleaning`, `chunking`, `embeddings`, `cosmos_client`, `retrieval`, `generation`, `safety`, `evaluation`, `api` |
+| `scripts/` | Manual scripts that hit live Azure (`verify_*`, `evaluate_retrieval`, `ask`, `check_prompt_injection`) — not pytest tests |
 | `tests/` | Unit tests for the pure pipeline stages |
 | `data/` | Source PDF(s) for ingestion, plus `eval_questions.json` ground truth |
 | `main.py` | Ingestion entry point: PDF → chunks → embed → upsert |
@@ -218,9 +248,12 @@ The headline items not yet addressed:
 - No hybrid (keyword + vector) search or re-ranking.
 - No automated grounding/quality eval for generated answers yet (retrieval has
   one — see above; generation doesn't).
+- Prompt Shields (Azure AI Content Safety's jailbreak/injection detector) isn't
+  used — not available in the Python SDK yet (see `src/safety.py`). Injection
+  defense today is prompt-level plus a manual behavioral check.
 
 ## Roadmap
 
-See [`plan.md`](plan.md) for the full 7-step plan (Norwegian). Remaining steps:
-content-safety filtering, a FastAPI endpoint, an MCP server wrapping that
-endpoint, and deployment to Azure App Service.
+See [`plan.md`](plan.md) for the full 7-step plan (Norwegian). Remaining
+steps: an MCP server wrapping the `/ask` endpoint, and deployment to Azure
+App Service.
