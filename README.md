@@ -8,10 +8,10 @@ it in Azure Cosmos DB for vector search. Built as a learning project to
 practice RAG fundamentals end to end, with an emphasis on getting the data
 pipeline correct before adding an LLM on top of it.
 
-**Status:** steps 1–5 of the 7-step roadmap in [`plan.md`](plan.md) are done —
+**Status:** steps 1–6 of the 7-step roadmap in [`plan.md`](plan.md) are done —
 extraction/chunking, embeddings/vector storage, grounded LLM answers via
-Azure AI Foundry, content moderation + prompt-injection defense, and a
-FastAPI endpoint. Steps 6–7 (an MCP server and deployment) are not built yet.
+Azure AI Foundry, content moderation + prompt-injection defense, a FastAPI
+endpoint, and an MCP server. Step 7 (deployment) is not built yet.
 
 ## Architecture
 
@@ -64,6 +64,11 @@ that validates the request body, calls `answer_question()`, and returns
 `{"answer": ..., "sources": [...]}`. A failed upstream call (`OpenAIError` /
 `AzureError`) becomes a `502`; anything unexpected falls through to FastAPI's
 default `500` handler rather than a bespoke error path for a one-endpoint app.
+
+`src/mcp_server.py` exposes the same capability as an MCP tool
+(`ask_study_assistant`) for MCP clients like Claude Desktop, using the MCP
+Python SDK's `FastMCP`. It calls `answer_question()` directly rather than
+going through the HTTP API - same logic, no extra network hop.
 
 ## Design choices
 
@@ -166,6 +171,22 @@ python -m scripts.check_prompt_injection      # eyeball behavior on adversarial 
 
 uvicorn src.api:app --reload                  # run the API locally at http://127.0.0.1:8000
 curl -X POST http://127.0.0.1:8000/ask -H "Content-Type: application/json" -d "{\"question\": \"What is an algorithm?\"}"
+
+python -m src.mcp_server                      # run the MCP server (stdio transport)
+```
+
+To use the MCP server from Claude Desktop, add it to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "studieassistent": {
+      "command": "C:\\path\\to\\repo\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "src.mcp_server"],
+      "cwd": "C:\\path\\to\\repo"
+    }
+  }
+}
 ```
 
 Run the test suite (offline, no Azure credentials needed — it only covers
@@ -226,7 +247,7 @@ not just a chunk count.
 
 | Path | Purpose |
 |---|---|
-| `src/` | Pipeline modules: `extraction`, `cleaning`, `chunking`, `embeddings`, `cosmos_client`, `retrieval`, `generation`, `safety`, `evaluation`, `api` |
+| `src/` | Pipeline modules: `extraction`, `cleaning`, `chunking`, `embeddings`, `cosmos_client`, `retrieval`, `generation`, `safety`, `evaluation`, `api`, `mcp_server` |
 | `scripts/` | Manual scripts that hit live Azure (`verify_*`, `evaluate_retrieval`, `ask`, `check_prompt_injection`) — not pytest tests |
 | `tests/` | Unit tests for the pure pipeline stages |
 | `data/` | Source PDF(s) for ingestion, plus `eval_questions.json` ground truth |
@@ -255,5 +276,4 @@ The headline items not yet addressed:
 ## Roadmap
 
 See [`plan.md`](plan.md) for the full 7-step plan (Norwegian). Remaining
-steps: an MCP server wrapping the `/ask` endpoint, and deployment to Azure
-App Service.
+step: deployment to Azure App Service.
